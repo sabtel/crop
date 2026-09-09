@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ابزار کراپ تصویر</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0a0f;
+    font-family: Tahoma, Arial, sans-serif;
+    color: #e2e8f0;
+    padding: 16px;
+  }
+
+  .app {
+    width: min(1100px, 100%);
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(100, 116, 139, 0.25);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+  }
+
+  .header {
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(100,116,139,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #38bdf8, #a78bfa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(100,116,139,0.2);
+    background: rgba(0,0,0,0.25);
+  }
+
+  .btn {
+    padding: 8px 16px;
+    border: 1px solid rgba(100,116,139,0.3);
+    border-radius: 10px;
+    background: rgba(30, 41, 59, 0.8);
+    color: #e2e8f0;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+
+  .btn:hover {
+    background: rgba(51, 65, 85, 0.9);
+    border-color: rgba(148,163,184,0.4);
+  }
+
+  .btn.primary {
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    border: none;
+    font-weight: 700;
+  }
+
+  .btn.primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .zoom-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(30,41,59,0.6);
+    border-radius: 10px;
+    padding: 4px 10px;
+    border: 1px solid rgba(100,116,139,0.2);
+  }
+
+  .zoom-group button {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(51,65,85,0.8);
+    color: #e2e8f0;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+
+  .zoom-group button:hover { background: rgba(71,85,105,0.9); }
+
+  .zoom-group span {
+    font-size: 12px;
+    color: #94a3b8;
+    min-width: 48px;
+    text-align: center;
+  }
+
+  .stage-wrap {
+    position: relative;
+    height: min(65vh, 600px);
+    background: #000;
+    overflow: hidden;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  canvas:active { cursor: grabbing; }
+
+  .hint {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    font-size: 11px;
+    color: rgba(148,163,184,0.7);
+    background: rgba(0,0,0,0.5);
+    padding: 6px 12px;
+    border-radius: 8px;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+  }
+
+  .toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .toggle-wrap input { accent-color: #38bdf8; }
+
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <h1>✂️ ابزار کراپ تصویر</h1>
+    <span style="font-size:11px;color:#64748b">Zoom: Scroll | Pan: Drag outside crop</span>
+  </div>
+
+  <div class="toolbar">
+    <label class="btn" for="fileInput">📁 بارگذاری تصویر</label>
+    <input type="file" id="fileInput" accept="image/*">
+    <button class="btn" id="btnSample">🖼️ تصویر نمونه</button>
+
+    <div class="zoom-group">
+      <button id="zoomOut" title="کوچک‌نمایی">−</button>
+      <span id="zoomLabel">100%</span>
+      <button id="zoomIn" title="بزرگ‌نمایی">+</button>
+    </div>
+
+    <button class="btn" id="btnReset">🔄 بازچینی</button>
+
+    <label class="toggle-wrap">
+      <input type="checkbox" id="chkBlackBg" checked>
+      پس‌زمینه سیاه در خروجی
+    </label>
+
+    <button class="btn primary" id="btnDownload">⬇️ کراپ و دانلود</button>
+  </div>
+
+  <div class="stage-wrap">
+    <canvas id="canvas"></canvas>
+    <div class="hint">داخل کراپ: جابجایی | گوشه‌ها: تغییر اندازه | بیرون: پان تصویر</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const fileInput = document.getElementById('fileInput');
+  const btnSample = document.getElementById('btnSample');
+  const btnReset = document.getElementById('btnReset');
+  const btnDownload = document.getElementById('btnDownload');
+  const zoomInBtn = document.getElementById('zoomIn');
+  const zoomOutBtn = document.getElementById('zoomOut');
+  const zoomLabel = document.getElementById('zoomLabel');
+  const chkBlackBg = document.getElementById('chkBlackBg');
+
+  const MIN_CROP = 40;
+  const MIN_SCALE = 0.05;
+  const MAX_SCALE = 15;
+  const HANDLES = ['nw','n','ne','e','se','s','sw','w'];
+
+  const state = {
+    img: null,
+    scale: 1,
+    ox: 0,
+    oy: 0,
+    crop: { x: 0, y: 0, w: 0, h: 0 },
+    mode: null,
+    handle: null,
+    startPointer: null,
+    startCrop: null,
+    startOffset: null
+  };
+
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+  function clampCrop() {
+    const W = canvas.clientWidth || 1;
+    const H = canvas.clientHeight || 1;
+    const c = state.crop;
+    c.w = clamp(c.w, MIN_CROP, W);
+    c.h = clamp(c.h, MIN_CROP, H);
+    c.x = clamp(c.x, 0, W - c.w);
+    c.y = clamp(c.y, 0, H - c.h);
+  }
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  function handlePos(h) {
+    const c = state.crop;
+    const x = h.includes('w') ? c.x : h.includes('e') ? c.x + c.w : c.x + c.w / 2;
+    const y = h.includes('n') ? c.y : h.includes('s') ? c.y + c.h : c.y + c.h / 2;
+    return { x, y };
+  }
+
+  function hitHandle(p) {
+    for (const h of HANDLES) {
+      const hp = handlePos(h);
+      if (Math.hypot(p.x - hp.x, p.y - hp.y) <= 14) return h;
+    }
+    return null;
+  }
+
+  function insideCrop(p) {
+    const c = state.crop;
+    return p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h;
+  }
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    clampCrop();
+    render();
+  }
+
+  function render() {
+    const W = canvas.clientWidth || 1;
+    const H = canvas.clientHeight || 1;
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    if (state.img) {
+      ctx.save();
+      ctx.translate(state.ox, state.oy);
+      ctx.scale(state.scale, state.scale);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(state.img, 0, 0);
+      ctx.restore();
+    }
+
+    const c = state.crop;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.rect(c.x, c.y, c.w, c.h);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+    ctx.fill('evenodd');
+    ctx.restore();
+
+    if (c.w > 100 && c.h > 100) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(c.x, c.y, c.w, c.h);
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(c.x + c.w / 3, c.y); ctx.lineTo(c.x + c.w / 3, c.y + c.h);
+      ctx.moveTo(c.x + 2 * c.w / 3, c.y); ctx.lineTo(c.x + 2 * c.w / 3, c.y + c.h);
+      ctx.moveTo(c.x, c.y + c.h / 3); ctx.lineTo(c.x + c.w, c.y + c.h / 3);
+      ctx.moveTo(c.x, c.y + 2 * c.h / 3); ctx.lineTo(c.x + c.w, c.y + 2 * c.h / 3);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 12;
+    ctx.strokeRect(c.x, c.y, c.w, c.h);
+    ctx.restore();
+
+    for (const h of HANDLES) {
+      const hp = handlePos(h);
+      ctx.save();
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 4;
+      ctx.fillRect(hp.x - 5, hp.y - 5, 10, 10);
+      ctx.strokeRect(hp.x - 5, hp.y - 5, 10, 10);
+      ctx.restore();
+    }
+
+    drawCenterPlus();
+  }
+
+  function drawCenterPlus() {
+    const c = state.crop;
+    const cx = c.x + c.w / 2;
+    const cy = c.y + c.h / 2;
+    const len = Math.max(28, Math.min(c.w, c.h) * 0.3);
+    const t = 3.5;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,255,255,0.3)';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 1;
+
+    roundRect(cx - len / 2, cy - t / 2, len, t, t / 2);
+    roundRect(cx - t / 2, cy - len / 2, t, len, t / 2);
+
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  function zoomAt(px, py, factor) {
+    if (!state.img) return;
+    const newScale = clamp(state.scale * factor, MIN_SCALE, MAX_SCALE);
+    const real = newScale / state.scale;
+    state.ox = px - (px - state.ox) * real;
+    state.oy = py - (py - state.oy) * real;
+    state.scale = newScale;
+    render();
+    updateZoomLabel();
+  }
+
+  function updateZoomLabel() {
+    zoomLabel.textContent = Math.round(state.scale * 100) + '%';
+  }
+
+  function setImage(img) {
+    state.img = img;
+    resetView();
+  }
+
+  function resetView() {
+    const W = canvas.clientWidth || 800;
+    const H = canvas.clientHeight || 500;
+    if (!state.img) return;
+    const pad = 0.9;
+    state.scale = Math.min(W / state.img.width, H / state.img.height) * pad;
+    state.ox = (W - state.img.width * state.scale) / 2;
+    state.oy = (H - state.img.height * state.scale) / 2;
+    state.crop = { x: W * 0.2, y: H * 0.2, w: W * 0.6, h: H * 0.6 };
+    clampCrop();
+    render();
+    updateZoomLabel();
+  }
+
+  function loadSample() {
+    const c = document.createElement('canvas');
+    c.width = 1600; c.height = 1000;
+    const g = c.getContext('2d');
+
+    const grad = g.createLinearGradient(0, 0, 1600, 1000);
+    grad.addColorStop(0, '#0f172a');
+    grad.addColorStop(0.5, '#1e3a8a');
+    grad.addColorStop(1, '#7c3aed');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 1600, 1000);
+
+    for (let i = 0; i < 80; i++) {
+      g.beginPath();
+      g.arc(Math.random() * 1600, Math.random() * 1000, Math.random() * 120 + 20, 0, Math.PI * 2);
+      g.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.12 + 0.03) + ')';
+      g.fill();
+    }
+
+    g.fillStyle = 'rgba(255,255,255,0.92)';
+    g.font = 'bold 80px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('تصویر نمونه', 800, 460);
+    g.font = '32px sans-serif';
+    g.fillStyle = 'rgba(255,255,255,0.6)';
+    g.fillText('برای آزمایش کراپ و زوم', 800, 550);
+
+    const img = new Image();
+    img.onload = () => setImage(img);
+    img.src = c.toDataURL('image/png');
+  }
+
+  function exportCrop() {
+    if (!state.img) { alert('ابتدا یک تصویر بارگذاری کنید'); return; }
+
+    const { x, y, w, h } = state.crop;
+    const s = state.scale;
+    const sx = (x - state.ox) / s;
+    const sy = (y - state.oy) / s;
+    const sw = w / s;
+    const sh = h / s;
+
+    let outW = Math.max(1, Math.round(sw));
+    let outH = Math.max(1, Math.round(sh));
+
+    const maxDim = 8192;
+    const ratio = Math.min(1, maxDim / Math.max(outW, outH));
+    if (ratio < 1) { outW = Math.max(1, Math.round(outW * ratio)); outH = Math.max(1, Math.round(outH * ratio)); }
+
+    const out = document.createElement('canvas');
+    out.width = outW; out.height = outH;
+    const octx = out.getContext('2d');
+
+    if (chkBlackBg.checked) {
+      octx.fillStyle = '#000';
+      octx.fillRect(0, 0, outW, outH);
+    }
+
+    const ix = Math.max(0, sx);
+    const iy = Math.max(0, sy);
+    const iw = Math.min(state.img.width, sx + sw) - ix;
+    const ih = Math.min(state.img.height, sy + sh) - iy;
+
+    if (iw > 0 && ih > 0) {
+      const dx = (ix - sx) * (outW / sw);
+      const dy = (iy - sy) * (outH / sh);
+      const dw = iw * (outW / sw);
+      const dh = ih * (outH / sh);
+      octx.imageSmoothingQuality = 'high';
+      octx.drawImage(state.img, ix, iy, iw, ih, dx, dy, dw, dh);
+    }
+
+    const a = document.createElement('a');
+    a.download = 'cropped-image.png';
+    a.href = out.toDataURL('image/png');
+    a.click();
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    if (!state.img) return;
+    e.preventDefault();
+    const p = getPos(e);
+    const h = hitHandle(p);
+
+    if (h) {
+      state.mode = 'resize';
+      state.handle = h;
+    } else if (insideCrop(p)) {
+      state.mode = 'move';
+    } else {
+      state.mode = 'pan';
+    }
+
+    state.startPointer = p;
+    state.startCrop = { ...state.crop };
+    state.startOffset = { x: state.ox, y: state.oy };
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    const p = getPos(e);
+
+    if (!state.mode) {
+      const h = hitHandle(p);
+      if (h) {
+        const cursors = { nw:'nwse-resize', se:'nwse-resize', ne:'nesw-resize', sw:'nesw-resize', n:'ns-resize', s:'ns-resize', e:'ew-resize', w:'ew-resize' };
+        canvas.style.cursor = cursors[h];
+      } else if (insideCrop(p)) {
+        canvas.style.cursor = 'move';
+      } else {
+        canvas.style.cursor = 'grab';
+      }
+      return;
+    }
+
+    const dx = p.x - state.startPointer.x;
+    const dy = p.y - state.startPointer.y;
+
+    if (state.mode === 'pan') {
+      state.ox = state.startOffset.x + dx;
+      state.oy = state.startOffset.y + dy;
+    } else if (state.mode === 'move') {
+      state.crop.x = state.startCrop.x + dx;
+      state.crop.y = state.startCrop.y + dy;
+      clampCrop();
+    } else if (state.mode === 'resize') {
+      let { x, y, w, h } = state.startCrop;
+      const hd = state.handle;
+
+      if (hd.includes('w')) { x = state.startCrop.x + dx; w = state.startCrop.w - dx; }
+      if (hd.includes('e')) { w = state.startCrop.w + dx; }
+      if (hd.includes('n')) { y = state.startCrop.y + dy; h = state.startCrop.h - dy; }
+      if (hd.includes('s')) { h = state.startCrop.h + dy; }
+
+      state.crop = { x, y, w, h };
+      clampCrop();
+    }
+
+    render();
+  });
+
+  canvas.addEventListener('pointerup', e => {
+    state.mode = null;
+    state.handle = null;
+    canvas.releasePointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointercancel', e => {
+    state.mode = null;
+    state.handle = null;
+  });
+
+  canvas.addEventListener('wheel', e => {
+    if (!state.img) return;
+    e.preventDefault();
+    const p = getPos(e);
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    zoomAt(p.x, p.y, factor);
+  }, { passive: false });
+
+  zoomInBtn.addEventListener('click', () => {
+    zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1.25);
+  });
+
+  zoomOutBtn.addEventListener('click', () => {
+    zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1 / 1.25);
+  });
+
+  btnReset.addEventListener('click', resetView);
+  btnSample.addEventListener('click', loadSample);
+  btnDownload.addEventListener('click', exportCrop);
+
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { setImage(img); URL.revokeObjectURL(url); };
+    img.src = url;
+  });
+
+  const stage = document.querySelector('.stage-wrap');
+  const ro = new ResizeObserver(resizeCanvas);
+  ro.observe(stage);
+
+  window.addEventListener('load', () => {
+    resizeCanvas();
+    loadSample();
+  });
+})();
+</script>
+</body>
+</html>
