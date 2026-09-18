@@ -191,7 +191,7 @@
 
   <div class="stage-wrap">
     <canvas id="canvas"></canvas>
-    <div class="hint">داخل کراپ: جابجایی | گوشه‌ها: تغییر اندازه | بیرون: پان تصویر</div>
+    <div class="hint">داخل کراپ: جابجایی | گوشه‌ها: تغییر اندازه | بیرون: پان تصویر | ✛ ثابت در مرکز، ذره‌بین کنارش</div>
   </div>
 </div>
 
@@ -212,6 +212,9 @@
   const MIN_SCALE = 0.05;
   const MAX_SCALE = 15;
   const HANDLES = ['nw','n','ne','e','se','s','sw','w'];
+  const LOUPE_RADIUS = 52;    // شعاع دایره‌ی ذره‌بین
+  const LOUPE_ZOOM = 2.5;     // ضریب بزرگ‌نمایی ذره‌بین
+  const LOUPE_GAP = 22;       // فاصله‌ی ذره‌بین از بعلاوه
 
   const state = {
     img: null,
@@ -292,6 +295,7 @@
 
     const c = state.crop;
 
+    // سایه‌ی بیرون کراپ
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, W, H);
@@ -300,6 +304,7 @@
     ctx.fill('evenodd');
     ctx.restore();
 
+    // خطوط راهنمای یک‌سوم
     if (c.w > 100 && c.h > 100) {
       ctx.save();
       ctx.beginPath();
@@ -316,6 +321,7 @@
       ctx.restore();
     }
 
+    // کادر کراپ
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 2;
@@ -324,6 +330,7 @@
     ctx.strokeRect(c.x, c.y, c.w, c.h);
     ctx.restore();
 
+    // دستگیره‌ها
     for (const h of HANDLES) {
       const hp = handlePos(h);
       ctx.save();
@@ -337,39 +344,124 @@
       ctx.restore();
     }
 
-    drawCenterPlus();
-  }
-
-  function drawCenterPlus() {
-    const c = state.crop;
+    // بعلاوه‌ی ثابت در مرکز کراپ
     const cx = c.x + c.w / 2;
     const cy = c.y + c.h / 2;
-    const len = Math.max(28, Math.min(c.w, c.h) * 0.3);
-    const t = 3.5;
+
+    drawFocus(cx, cy);
+    drawLoupe(cx, cy);
+  }
+
+  /* بعلاوه‌ی مرکزی ظریف و نازک */
+  function drawFocus(cx, cy) {
+    const len = 22;
+    const gap = 4;
+    const t = 1.2;
 
     ctx.save();
-    ctx.shadowColor = 'rgba(255,255,255,0.3)';
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 1;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = t;
+    ctx.shadowColor = 'rgba(0,0,0,0.65)';
+    ctx.shadowBlur = 4;
 
-    roundRect(cx - len / 2, cy - t / 2, len, t, t / 2);
-    roundRect(cx - t / 2, cy - len / 2, t, len, t / 2);
+    ctx.beginPath();
+    // خط افقی
+    ctx.moveTo(cx - len / 2, cy); ctx.lineTo(cx - gap, cy);
+    ctx.moveTo(cx + gap, cy);     ctx.lineTo(cx + len / 2, cy);
+    // خط عمودی
+    ctx.moveTo(cx, cy - len / 2); ctx.lineTo(cx, cy - gap);
+    ctx.moveTo(cx, cy + gap);     ctx.lineTo(cx, cy + len / 2);
+    ctx.stroke();
+    ctx.restore();
 
+    // نقطه‌ی مرکزی ریز
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 1.4, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 
-  function roundRect(x, y, w, h, r) {
-    r = Math.min(r, w / 2, h / 2);
-    ctx.beginPath();
-    if (ctx.roundRect) {
-      ctx.roundRect(x, y, w, h, r);
-    } else {
-      ctx.rect(x, y, w, h);
+  /* ذره‌بین دایره‌ای کنار بعلاوه که نقطه‌ی زیر مرکز بعلاوه را بزرگ‌نمایی می‌کند */
+  function drawLoupe(cx, cy) {
+    if (!state.img) return;
+    const W = canvas.clientWidth || 1;
+    const H = canvas.clientHeight || 1;
+    const R = LOUPE_RADIUS;
+    const L = LOUPE_ZOOM;
+
+    // ذره‌بین: اول سمت راست بعلاوه، اگر بیرون بوم افتاد سمت چپ
+    let lx = cx + R + LOUPE_GAP;
+    let ly = cy;
+    if (lx + R > W - 4) {
+      lx = cx - R - LOUPE_GAP;
     }
-    ctx.fill();
+    // محدود کردن داخل بوم (در صورت کوچک بودن بوم)
+    lx = clamp(lx, R + 4, W - R - 4);
+    ly = clamp(ly, R + 4, H - R - 4);
+
+    // مختصات تصویرِ زیر مرکز بعلاوه
+    const ix = (cx - state.ox) / state.scale;
+    const iy = (cy - state.oy) / state.scale;
+
+    // خط راهنمای نازک بین بعلاوه و ذره‌بین
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(lx, ly);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
     ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    // برش دایره‌ای
+    ctx.beginPath();
+    ctx.arc(lx, ly, R, 0, Math.PI * 2);
+    ctx.clip();
+
+    // پس‌زمینه سیاه داخل ذره‌بین
+    ctx.fillStyle = '#000';
+    ctx.fillRect(lx - R, ly - R, R * 2, R * 2);
+
+    // رسم تصویر بزرگ‌شده به طوری که نقطه (ix, iy) در مرکز ذره‌بین بیفتد
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.scale(L, L);
+    ctx.translate(-ix, -iy);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(state.img, 0, 0);
+    ctx.restore();
+
+    // حلقه‌ی دور ذره‌بین
+    ctx.beginPath();
+    ctx.arc(lx, ly, R, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // حلقه‌ی داخلی ظریف
+    ctx.beginPath();
+    ctx.arc(lx, ly, R - 3, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56,189,248,0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // خطوط راهنمای مرکز ذره‌بین
+    ctx.beginPath();
+    ctx.moveTo(lx - 8, ly); ctx.lineTo(lx + 8, ly);
+    ctx.moveTo(lx, ly - 8); ctx.lineTo(lx, ly + 8);
+    ctx.strokeStyle = 'rgba(56,189,248,0.9)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   function zoomAt(px, py, factor) {
@@ -504,6 +596,7 @@
     state.startCrop = { ...state.crop };
     state.startOffset = { x: state.ox, y: state.oy };
     canvas.setPointerCapture(e.pointerId);
+    render();
   });
 
   canvas.addEventListener('pointermove', e => {
@@ -551,12 +644,15 @@
   canvas.addEventListener('pointerup', e => {
     state.mode = null;
     state.handle = null;
-    canvas.releasePointerCapture(e.pointerId);
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    canvas.style.cursor = 'grab';
+    render();
   });
 
-  canvas.addEventListener('pointercancel', e => {
+  canvas.addEventListener('pointercancel', () => {
     state.mode = null;
     state.handle = null;
+    render();
   });
 
   canvas.addEventListener('wheel', e => {
@@ -567,12 +663,15 @@
     zoomAt(p.x, p.y, factor);
   }, { passive: false });
 
+  // زوم حول مرکز بعلاوه (یعنی مرکز کراپ)
   zoomInBtn.addEventListener('click', () => {
-    zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1.25);
+    const c = state.crop;
+    zoomAt(c.x + c.w / 2, c.y + c.h / 2, 1.25);
   });
 
   zoomOutBtn.addEventListener('click', () => {
-    zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1 / 1.25);
+    const c = state.crop;
+    zoomAt(c.x + c.w / 2, c.y + c.h / 2, 1 / 1.25);
   });
 
   btnReset.addEventListener('click', resetView);
